@@ -95,6 +95,10 @@ ENV WEBP_QUALITY=85 \
     AVIF_MIN=30 \
     AVIF_MAX=50
 
+RUN zypper --non-interactive ref && \
+    zypper --non-interactive install --no-recommends findutils && \
+    zypper clean -a
+
 COPY --from=builder /opt/tools /opt/tools
 
 RUN set -euo pipefail && \

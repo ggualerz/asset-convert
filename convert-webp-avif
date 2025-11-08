@@ -125,9 +125,14 @@ convert_file() {
   fi
 
   if needs_rebuild "$src" "$webp"; then
-    if [[ "$lower_ext" == "gif" && "$animated_gif" == true && command_exists gif2webp ]]; then
-      log "Generating ${pretty_dir}/${name}.webp (animated GIF)"
-      gif2webp -quiet -mixed -q "$WEBP_QUALITY" "$src" -o "$webp"
+    if [[ "$lower_ext" == "gif" && "$animated_gif" == true ]]; then
+      if command_exists gif2webp; then
+        log "Generating ${pretty_dir}/${name}.webp (animated GIF)"
+        gif2webp -quiet -mixed -q "$WEBP_QUALITY" "$src" -o "$webp"
+      else
+        log "Generating ${pretty_dir}/${name}.webp"
+        cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"
+      fi
     else
       log "Generating ${pretty_dir}/${name}.webp"
       cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"
@@ -138,7 +143,7 @@ convert_file() {
 
   if needs_rebuild "$src" "$avif"; then
     log "Generating ${pretty_dir}/${name}.avif"
-    avifenc --quiet --min "$AVIF_MIN" --max "$AVIF_MAX" --jobs 0 --speed 6 "$src" "$avif"
+    avifenc --min "$AVIF_MIN" --max "$AVIF_MAX" -j 0 --speed 6 "$src" "$avif"
   else
     log "Skipping up-to-date $rel -> ${name}.avif"
   fi
