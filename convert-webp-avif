@@ -2,10 +2,15 @@
 set -euo pipefail
 
 WEBP_QUALITY="${WEBP_QUALITY:-85}"
-AVIF_MIN="${AVIF_MIN:-30}"
-AVIF_MAX="${AVIF_MAX:-50}"
+AVIF_QUALITY="${AVIF_QUALITY:-}"
+DEFAULT_AVIF_QUALITY="${DEFAULT_AVIF_QUALITY:-37}"
 
 ROOT_DIR="/work"
+
+EXCLUDE_PATHS=()
+if [[ -d "${ROOT_DIR%/}/lost+found" ]]; then
+  EXCLUDE_PATHS+=("${ROOT_DIR%/}/lost+found")
+fi
 
 if ! command -v cwebp >/dev/null 2>&1; then
   echo "cwebp not found on PATH" >&2
@@ -40,13 +45,23 @@ normalize_path() {
   fi
 }
 
+find_images() {
+  local dir="$1"
+  local -a find_cmd=(find "$dir")
+  for exclude in "${EXCLUDE_PATHS[@]}"; do
+    find_cmd+=(-path "$exclude" -prune -o)
+  done
+  find_cmd+=(-type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \) -print0)
+  "${find_cmd[@]}" 2>/dev/null
+}
+
 gather_from_dir() {
   local dir="$1"
   if [[ ! -d "$dir" ]]; then
     log "Skipping missing directory $dir"
     return
   fi
-  find "$dir" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \) -print0
+  find_images "$dir"
 }
 
 gather_from_file() {
@@ -66,7 +81,52 @@ gather_from_file() {
 }
 
 collect_all() {
-  find "$ROOT_DIR" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \) -print0
+  find_images "$ROOT_DIR"
+}
+
+quantizer_to_quality() {
+  local min_q="$1"
+  local max_q="$2"
+  awk -v min="$min_q" -v max="$max_q" 'BEGIN {
+    avg=(min+max)/2.0
+    if (avg < 0) {
+      avg = 0
+    }
+    if (avg > 63) {
+      avg = 63
+    }
+    q=100 - (avg * 100.0 / 63.0)
+    if (q < 0) {
+      q = 0
+    }
+    if (q > 100) {
+      q = 100
+    }
+    printf("%d", (q >= 0) ? int(q + 0.5) : 0)
+  }'
+}
+
+determine_avif_quality() {
+  if [[ -n "$AVIF_QUALITY" ]]; then
+    printf '%s\n' "$AVIF_QUALITY"
+    return
+  fi
+
+  if [[ -n ${AVIF_MIN+set} || -n ${AVIF_MAX+set} ]]; then
+    local min_value="${AVIF_MIN:-30}"
+    local max_value="${AVIF_MAX:-50}"
+    if [[ "$min_value" =~ ^[0-9]+$ && "$max_value" =~ ^[0-9]+$ ]]; then
+      local quality
+      quality=$(quantizer_to_quality "$min_value" "$max_value")
+      log "AVIF_MIN/AVIF_MAX are deprecated; using AVIF_QUALITY=$quality (from min=$min_value, max=$max_value)"
+      printf '%s\n' "$quality"
+      return
+    else
+      log "AVIF_MIN/AVIF_MAX must be numeric; falling back to default quality"
+    fi
+  fi
+
+  printf '%s\n' "$DEFAULT_AVIF_QUALITY"
 }
 
 is_animated_gif() {
@@ -75,6 +135,11 @@ is_animated_gif() {
   frames=$(gifsicle --info "$1" 2>/dev/null | awk '/image #/ {count++} END {print count+0}')
   [[ "${frames:-0}" -gt 1 ]]
 }
+
+AVIF_ENCODING_QUALITY=$(determine_avif_quality)
+readonly AVIF_ENCODING_QUALITY
+AVIF_ALPHA_QUALITY="${AVIF_ALPHA_QUALITY:-$AVIF_ENCODING_QUALITY}"
+readonly AVIF_ALPHA_QUALITY
 
 mapfile -d '' -t targets < <(
   if [[ "$#" -eq 0 ]]; then
@@ -143,7 +208,7 @@ convert_file() {
 
   if needs_rebuild "$src" "$avif"; then
     log "Generating ${pretty_dir}/${name}.avif"
-    avifenc --min "$AVIF_MIN" --max "$AVIF_MAX" -j 0 --speed 6 "$src" "$avif"
+    avifenc -q "$AVIF_ENCODING_QUALITY" --alpha-quality "$AVIF_ALPHA_QUALITY" -j 0 --speed 6 "$src" "$avif"
   else
     log "Skipping up-to-date $rel -> ${name}.avif"
   fi
