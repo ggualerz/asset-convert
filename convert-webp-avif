@@ -183,8 +183,12 @@ convert_file() {
   local extension="${base##*.}"
   local lower_ext="${extension,,}"
   local animated_gif=false
-  if [[ "$lower_ext" == "gif" ]] && is_animated_gif "$src"; then
-    animated_gif=true
+  local skip_avif=false
+  if [[ "$lower_ext" == "gif" ]]; then
+    if is_animated_gif "$src"; then
+      animated_gif=true
+    fi
+    skip_avif=true
   fi
   local subdir=""
   if [[ "$dir" != "." ]]; then
@@ -203,22 +207,40 @@ convert_file() {
     if [[ "$lower_ext" == "gif" && "$animated_gif" == true ]]; then
       if command_exists gif2webp; then
         log "Generating ${pretty_dir}/${name}.webp (animated GIF)"
-        gif2webp -quiet -mixed -q "$WEBP_QUALITY" "$src" -o "$webp"
+        if ! gif2webp -quiet -mixed -q "$WEBP_QUALITY" "$src" -o "$webp"; then
+          log "Failed to convert $rel to WebP via gif2webp; skipping"
+          rm -f "$webp"
+          return 0
+        fi
       else
         log "Generating ${pretty_dir}/${name}.webp"
-        cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"
+        if ! cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"; then
+          log "Failed to convert $rel to WebP via cwebp; skipping"
+          rm -f "$webp"
+          return 0
+        fi
       fi
     else
       log "Generating ${pretty_dir}/${name}.webp"
-      cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"
+      if ! cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"; then
+        log "Failed to convert $rel to WebP via cwebp; skipping"
+        rm -f "$webp"
+        return 0
+      fi
     fi
   else
     log "Skipping up-to-date $rel -> ${name}.webp"
   fi
 
-  if needs_rebuild "$src" "$avif"; then
+  if [[ "$skip_avif" == true ]]; then
+    log "Skipping ${pretty_dir}/${name}.avif (GIF input not supported)"
+  elif needs_rebuild "$src" "$avif"; then
     log "Generating ${pretty_dir}/${name}.avif"
-    avifenc -q "$AVIF_ENCODING_QUALITY" "$AVIF_ALPHA_FLAG" "$AVIF_ALPHA_QUALITY" -j 0 --speed 6 "$src" "$avif"
+    if ! avifenc -q "$AVIF_ENCODING_QUALITY" "$AVIF_ALPHA_FLAG" "$AVIF_ALPHA_QUALITY" -j 0 --speed 6 "$src" "$avif"; then
+      log "Failed to convert $rel to AVIF; skipping"
+      rm -f "$avif"
+      return 0
+    fi
   else
     log "Skipping up-to-date $rel -> ${name}.avif"
   fi
