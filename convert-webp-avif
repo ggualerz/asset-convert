@@ -22,6 +22,14 @@ if ! command -v avifenc >/dev/null 2>&1; then
   exit 1
 fi
 
+detect_avif_alpha_flag() {
+  if avifenc --help 2>&1 | grep -q -- '--qalpha'; then
+    printf '%s\n' '--qalpha'
+  else
+    printf '%s\n' '--alpha-quality'
+  fi
+}
+
 log() {
   printf '[asset-convert] %s\n' "$*" >&2
 }
@@ -140,6 +148,8 @@ AVIF_ENCODING_QUALITY=$(determine_avif_quality)
 readonly AVIF_ENCODING_QUALITY
 AVIF_ALPHA_QUALITY="${AVIF_ALPHA_QUALITY:-$AVIF_ENCODING_QUALITY}"
 readonly AVIF_ALPHA_QUALITY
+AVIF_ALPHA_FLAG=$(detect_avif_alpha_flag)
+readonly AVIF_ALPHA_FLAG
 
 mapfile -d '' -t targets < <(
   if [[ "$#" -eq 0 ]]; then
@@ -208,7 +218,7 @@ convert_file() {
 
   if needs_rebuild "$src" "$avif"; then
     log "Generating ${pretty_dir}/${name}.avif"
-    avifenc -q "$AVIF_ENCODING_QUALITY" --alpha-quality "$AVIF_ALPHA_QUALITY" -j 0 --speed 6 "$src" "$avif"
+    avifenc -q "$AVIF_ENCODING_QUALITY" "$AVIF_ALPHA_FLAG" "$AVIF_ALPHA_QUALITY" -j 0 --speed 6 "$src" "$avif"
   else
     log "Skipping up-to-date $rel -> ${name}.avif"
   fi
