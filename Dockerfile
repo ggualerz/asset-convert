@@ -96,7 +96,9 @@ ENV WEBP_QUALITY=85 \
     AVIF_MAX=50
 
 RUN zypper --non-interactive ref && \
-    zypper --non-interactive install --no-recommends findutils && \
+    zypper --non-interactive install --no-recommends \
+      findutils \
+      gawk && \
     zypper clean -a
 
 COPY --from=builder /opt/tools /opt/tools
