@@ -57,15 +57,16 @@ docker run --rm \
 ## Tuning (environment variables)
 
 - `WEBP_QUALITY` (default: `85`) — WebP quality (0–100).
-- `AVIF_MIN` (default: `30`) — AVIF min quantizer (lower = better).
-- `AVIF_MAX` (default: `50`) — AVIF max quantizer.
+- `AVIF_QUALITY` (default: `37`) — AVIF quality (0–100, higher = better).
+- `AVIF_ALPHA_QUALITY` (default: matches `AVIF_QUALITY`) — AVIF alpha-channel quality (0–100).
+- `AVIF_MIN` / `AVIF_MAX` — **deprecated** quantizer knobs. When present they are translated to an approximate `AVIF_QUALITY` so existing pipelines keep working, but you should migrate to `AVIF_QUALITY` directly.
 
 Examples:
 
 ```sh
 # Slightly lighter WebP and AVIF
 docker run --rm -v "$PWD:/work" \
-  -e WEBP_QUALITY=80 -e AVIF_MIN=28 -e AVIF_MAX=42 \
+  -e WEBP_QUALITY=80 -e AVIF_QUALITY=40 \
   asset-convert:1.0.0-bci-base-16.0-10.3
 
 # Convert only a folder
@@ -85,7 +86,7 @@ Typical pipeline steps:
 ## Tips
 
 - Keep originals in source control; generated files can be cached or stored as build artifacts.
-- For photographic assets, try `WEBP_QUALITY=82` and `AVIF_MAX≈45` for a balanced trade-off.
+- For photographic assets, try `WEBP_QUALITY=82` and `AVIF_QUALITY≈40` for a balanced trade-off.
 - For UI/graphics with flat colors, pre-check PNG conversions to avoid visible banding.
 - Animated GIFs are preserved when producing WebP (we switch to `gif2webp` under the hood). Keep originals around if you still need GIF outputs or want to re-run `gifsicle` manually.
 
@@ -137,7 +138,7 @@ Additional tags defined in `OCI_IMAGE_ADDITIONAL_TAGS` (comma-separated) are app
 
 - **“No images found”**: confirm paths or pass explicit files/dirs.
 - **Permission issues**: add `-u $(id -u):$(id -g)` when running.
-- **Slow conversion**: start with looser AVIF settings (`AVIF_MIN=32 AVIF_MAX=48`).
+- **Slow conversion**: start with looser AVIF settings (e.g., `AVIF_QUALITY=45`).
 
 ## Versioning note
 
