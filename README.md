@@ -1,7 +1,7 @@
 # README — asset-convert
 
 Convert JPG/PNG to WebP and AVIF. Minimal, non-root, CI-friendly.  
-Base image: **SUSE BCI Micro**
+Base image: **SUSE BCI Base**
 
 ## What it does
 
@@ -19,19 +19,19 @@ Base image: **SUSE BCI Micro**
 Build the image locally (choose your own tag/name):
 
 ```sh
-docker build -t asset-convert:1.0.0-bci-micro-16.0 .
+docker build -t asset-convert:1.0.0-bci-base-16.0 .
 ```
 
 Convert everything under the current directory:
 
 ```sh
-docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-micro-16.0
+docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-base-16.0
 ```
 
 Convert only specific files/paths:
 
 ```sh
-docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-micro-16.0 path/to/a.png path/to/b.jpg
+docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-base-16.0 path/to/a.png path/to/b.jpg
 ```
 
 ## Non-root usage
@@ -42,7 +42,7 @@ Map your host UID/GID so outputs are owned by you:
 docker run --rm \
   -u "$(id -u)":"$(id -g)" \
   -v "$PWD:/work" \
-  asset-convert:1.0.0-bci-micro-16.0
+  asset-convert:1.0.0-bci-base-16.0
 ```
 
 ## CLI behavior
@@ -64,10 +64,10 @@ Examples:
 # Slightly lighter WebP and AVIF
 docker run --rm -v "$PWD:/work" \
   -e WEBP_QUALITY=80 -e AVIF_MIN=28 -e AVIF_MAX=42 \
-  asset-convert:1.0.0-bci-micro-16.0
+  asset-convert:1.0.0-bci-base-16.0
 
 # Convert only a folder
-docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-micro-16.0 public/images/
+docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-base-16.0 public/images/
 ```
 
 ## Pairing with a webserver (sidecar pattern)
@@ -89,10 +89,10 @@ Typical pipeline steps:
 
 ## Publishing to Docker Hub
 
-Use `publish-asset-convert.sh` to build and push tags that follow the `x.y.z-bci-micro-16.0` pattern.
+Use `publish-asset-convert.sh` to build and push tags that follow the `x.y.z-bci-base-16.0` pattern.
 
-1. Run the script once to generate `release.env`, then edit it with your Docker Hub repository, username, optional extra tags (e.g., `latest`), and leave `BCI_MICRO_VERSION` as `16.0` unless the base image changes.
-2. Execute `./publish-asset-convert.sh` and follow the prompts to bump or set the semantic version (the script appends `-bci-micro-16.0` automatically).
+1. Run the script once to generate `release.env`, then edit it with your Docker Hub repository, username, optional extra tags (e.g., `latest`). The script auto-detects `BCI_VARIANT`/`BCI_VERSION` from the `Dockerfile` `FROM` line; override them in `release.env` only if you need a custom value.
+2. Execute `./publish-asset-convert.sh` and follow the prompts to bump or set the semantic version (the script appends `-bci-base-16.0` automatically).
 3. When prompted, paste a Docker Hub access token/password so the script can `docker login`, `docker build`, tag, and push the resulting image.
 
 Additional tags defined in `OCI_IMAGE_ADDITIONAL_TAGS` (comma-separated) are applied to the same build, which is helpful for maintaining a `latest` tag alongside versioned releases.
@@ -105,4 +105,4 @@ Additional tags defined in `OCI_IMAGE_ADDITIONAL_TAGS` (comma-separated) are app
 
 ## Versioning note
 
-When publishing (e.g., via GitHub Actions to Docker Hub), tag images with the pattern `x.x.x-bci-micro-16.0` to reflect both your release and the SUSE base version.
+When publishing (e.g., via GitHub Actions to Docker Hub), tag images with the pattern `x.x.x-bci-base-16.0` to reflect both your release and the SUSE base version.

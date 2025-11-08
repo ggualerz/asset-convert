@@ -90,6 +90,22 @@ normalize_image_repo() {
   echo "$repo"
 }
 
+infer_bci_from_dockerfile() {
+  local dockerfile="$SCRIPT_DIR/Dockerfile"
+  [[ ! -f "$dockerfile" ]] && return
+  local line image ref name variant version
+  line=$(grep -m1 -E '^FROM[[:space:]]+registry\.suse\.com/bci/' "$dockerfile" || true)
+  [[ -z "$line" ]] && return
+  image=${line#FROM }
+  image=${image%% *}
+  ref=${image#registry.suse.com/bci/}
+  name=${ref%%:*}
+  version=${ref##*:}
+  if [[ -n "$name" && "$name" != "$ref" && -n "$version" && "$version" != "$ref" ]]; then
+    printf '%s:%s\n' "$name" "$version"
+  fi
+}
+
 login_to_registry() {
   local tool=$1 host=$2 username=$3 prompt=$4
   read -r -s -p "$prompt" registry_secret || true
@@ -158,13 +174,15 @@ if [[ ! -f "$RELEASE_ENV" ]]; then
 #   OCI_IMAGE_ADDITIONAL_TAGS=latest
 #   IMAGE_BUILDER=auto
 #   LAST_RELEASE_VERSION=0.1.0
-#   BCI_MICRO_VERSION=16.0
+#   BCI_VARIANT=
+#   BCI_VERSION=
 OCI_IMAGE_REPOSITORY=docker.io/youruser/asset-convert
 OCI_IMAGE_USERNAME=
 OCI_IMAGE_ADDITIONAL_TAGS=
 IMAGE_BUILDER=auto
 LAST_RELEASE_VERSION=
-BCI_MICRO_VERSION=16.0
+BCI_VARIANT=
+BCI_VERSION=
 ENV_TEMPLATE
   error "release.env created at $RELEASE_ENV. Populate it with your values and rerun."
 fi
@@ -183,8 +201,18 @@ if [[ -z "$IMAGE_REPOSITORY" ]]; then
   error "OCI image repository must be specified (via release.env or --image-repo)"
 fi
 
-BCI_MICRO_VERSION=${BCI_MICRO_VERSION:-16.0}
-BCI_SUFFIX="-bci-micro-${BCI_MICRO_VERSION}"
+if [[ -z "${BCI_VARIANT:-}" || -z "${BCI_VERSION:-}" ]]; then
+  inferred=$(infer_bci_from_dockerfile || true)
+  if [[ -n "$inferred" ]]; then
+    IFS=':' read -r inferred_variant inferred_version <<<"$inferred"
+    BCI_VARIANT=${BCI_VARIANT:-$inferred_variant}
+    BCI_VERSION=${BCI_VERSION:-$inferred_version}
+  fi
+fi
+
+BCI_VARIANT=${BCI_VARIANT:-bci-base}
+BCI_VERSION=${BCI_VERSION:-16.0}
+BCI_SUFFIX="-$BCI_VARIANT-$BCI_VERSION"
 
 IMAGE_REGISTRY_HOST=${IMAGE_REPOSITORY%%/*}
 if [[ -z "$IMAGE_REGISTRY_HOST" ]]; then
