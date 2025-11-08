@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WEBP_QUALITY="${WEBP_QUALITY:-85}"
+AVIF_MIN="${AVIF_MIN:-30}"
+AVIF_MAX="${AVIF_MAX:-50}"
+
+ROOT_DIR="/work"
+
+if ! command -v cwebp >/dev/null 2>&1; then
+  echo "cwebp not found on PATH" >&2
+  exit 1
+fi
+
+if ! command -v avifenc >/dev/null 2>&1; then
+  echo "avifenc not found on PATH" >&2
+  exit 1
+fi
+
+log() {
+  printf '[asset-convert] %s\n' "$*" >&2
+}
+
+needs_rebuild() {
+  local source="$1"
+  local target="$2"
+  [[ ! -f "$target" || "$source" -nt "$target" ]]
+}
+
+normalize_path() {
+  local target="$1"
+  if [[ "$target" == /* ]]; then
+    printf '%s\n' "$target"
+  else
+    printf '%s\n' "${ROOT_DIR%/}/$target"
+  fi
+}
+
+gather_from_dir() {
+  local dir="$1"
+  if [[ ! -d "$dir" ]]; then
+    log "Skipping missing directory $dir"
+    return
+  fi
+  find "$dir" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \) -print0
+}
+
+gather_from_file() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    log "Skipping missing file $file"
+    return
+  fi
+  case "${file,,}" in
+    *.jpg|*.jpeg|*.png|*.gif)
+      printf '%s\0' "$file"
+      ;;
+    *)
+      log "Skipping unsupported file $file"
+      ;;
+  esac
+}
+
+collect_all() {
+  find "$ROOT_DIR" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \) -print0
+}
+
+mapfile -d '' -t targets < <(
+  if [[ "$#" -eq 0 ]]; then
+    collect_all | sort -z
+  else
+    for arg in "$@"; do
+      abs=$(normalize_path "$arg")
+      if [[ -d "$abs" ]]; then
+        gather_from_dir "$abs"
+      else
+        gather_from_file "$abs"
+      fi
+    done | sort -z
+  fi
+)
+
+if [[ "${#targets[@]}" -eq 0 ]]; then
+  log "No images found to convert"
+  exit 0
+fi
+
+convert_file() {
+  local src="$1"
+  local rel
+  rel="${src#$ROOT_DIR/}"
+  local dir
+  dir="$(dirname "$rel")"
+  local base
+  base="$(basename "$rel")"
+  local name="${base%.*}"
+  local subdir=""
+  if [[ "$dir" != "." ]]; then
+    subdir="$dir/"
+  fi
+
+  local webp="${ROOT_DIR%/}/${subdir}${name}.webp"
+  local avif="${ROOT_DIR%/}/${subdir}${name}.avif"
+
+  local pretty_dir="${dir#./}"
+  if [[ -z "$pretty_dir" || "$pretty_dir" == "." ]]; then
+    pretty_dir="."
+  fi
+
+  if needs_rebuild "$src" "$webp"; then
+    log "Generating ${pretty_dir}/${name}.webp"
+    cwebp -quiet -q "$WEBP_QUALITY" "$src" -o "$webp"
+  else
+    log "Skipping up-to-date $rel -> ${name}.webp"
+  fi
+
+  if needs_rebuild "$src" "$avif"; then
+    log "Generating ${pretty_dir}/${name}.avif"
+    avifenc --quiet --min "$AVIF_MIN" --max "$AVIF_MAX" --jobs 0 --speed 6 "$src" "$avif"
+  else
+    log "Skipping up-to-date $rel -> ${name}.avif"
+  fi
+}
+
+for target in "${targets[@]}"; do
+  convert_file "$target"
+done
