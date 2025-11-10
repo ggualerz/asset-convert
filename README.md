@@ -53,6 +53,7 @@ docker run --rm \
 - **With args:** processes only the provided files or directories (relative to `/work`).
 - Timestamp-aware: re-runs conversions whenever the source image is newer than the existing `.webp` / `.avif`, otherwise skips.
 - Animated GIF sources automatically route through `gif2webp` so their frames remain intact in the generated `.webp`.
+- Regex-aware `--profile` flags let you override WebP/AVIF quality for matching files.
 
 ## Tuning (environment variables)
 
@@ -71,6 +72,17 @@ docker run --rm -v "$PWD:/work" \
 
 # Convert only a folder
 docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-base-16.0-10.3 public/images/
+```
+
+## Regex-driven profiles
+
+Match files by regex and adjust encoder settings with one or more `--profile` flags. The first matching profile applies and any omitted qualities fall back to the defaults or environment overrides. `avif-alpha` and `avifAlpha` are interchangeable keys for controlling the AVIF alpha-channel quality per profile.
+
+```sh
+# Higher quality for UI icons, lighter touch for thumbnails
+docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-base-16.0-10.3 \
+  --profile 'regex=^public/icons/.*\\.png$;webp=92;avif=42' \
+  --profile 'regex=^public/thumbnails/.*;webp=80;avif=38'
 ```
 
 ## Pairing with a webserver (sidecar pattern)
