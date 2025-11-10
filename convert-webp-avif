@@ -23,10 +23,15 @@ if ! command -v avifenc >/dev/null 2>&1; then
 fi
 
 detect_avif_alpha_flag() {
-  if avifenc --help 2>&1 | grep -q -- '--qalpha'; then
+  local help_output
+  help_output="$(avifenc --help 2>&1 || true)"
+
+  if grep -q -- '--qalpha' <<<"$help_output"; then
     printf '%s\n' '--qalpha'
-  else
+  elif grep -q -- '--alpha-quality' <<<"$help_output"; then
     printf '%s\n' '--alpha-quality'
+  else
+    printf '%s\n' '--qalpha'
   fi
 }
 
