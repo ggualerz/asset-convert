@@ -76,7 +76,7 @@ docker run --rm -v "$PWD:/work" asset-convert:1.0.0-bci-base-16.0-10.3 public/im
 
 ## Regex-driven profiles
 
-Match files by regex and adjust encoder settings with one or more `--profile` flags. The first matching profile applies and any omitted qualities fall back to the defaults or environment overrides.
+Match files by regex and adjust encoder settings with one or more `--profile` flags. The first matching profile applies and any omitted qualities fall back to the defaults or environment overrides. `avif-alpha` and `avifAlpha` are interchangeable keys for controlling the AVIF alpha-channel quality per profile.
 
 ```sh
 # Higher quality for UI icons, lighter touch for thumbnails

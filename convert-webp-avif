@@ -103,7 +103,7 @@ parse_profile_definition() {
           fi
         fi
         ;;
-      avif-alpha=*|avif_alpha=*)
+      avif-alpha=*|avif_alpha=*|avifAlpha=*)
         avif_alpha="${part#*=}"
         if [[ -n "$avif_alpha" ]]; then
           if ! is_integer "$avif_alpha"; then
