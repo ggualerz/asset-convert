@@ -59,11 +59,20 @@ trim_whitespace() {
   printf '%s' "$value"
 }
 
+normalize_profile_regex() {
+  local pattern="$1"
+  if [[ "$pattern" == *'(?:'* ]]; then
+    pattern=$(printf '%s' "$pattern" | sed 's/(?:/(/g')
+  fi
+  printf '%s' "$pattern"
+}
+
 is_integer() {
   [[ "$1" =~ ^[0-9]+$ ]]
 }
 
 declare -a PROFILE_PATTERNS=()
+declare -a PROFILE_DISPLAY_PATTERNS=()
 declare -a PROFILE_WEBP_QUALITIES=()
 declare -a PROFILE_AVIF_QUALITIES=()
 declare -a PROFILE_AVIF_ALPHA_QUALITIES=()
@@ -124,7 +133,10 @@ parse_profile_definition() {
     exit 1
   fi
 
-  PROFILE_PATTERNS+=("$regex")
+  local normalized_regex
+  normalized_regex=$(normalize_profile_regex "$regex")
+  PROFILE_PATTERNS+=("$normalized_regex")
+  PROFILE_DISPLAY_PATTERNS+=("$regex")
   PROFILE_WEBP_QUALITIES+=("$webp")
   PROFILE_AVIF_QUALITIES+=("$avif")
   PROFILE_AVIF_ALPHA_QUALITIES+=("$avif_alpha")
@@ -293,16 +305,19 @@ readonly AVIF_ALPHA_FLAG
 declare SELECTED_WEBP_QUALITY=""
 declare SELECTED_AVIF_QUALITY=""
 declare SELECTED_AVIF_ALPHA_QUALITY=""
+declare LAST_MATCHED_PROFILE_PATTERN=""
 
 select_profile_for_path() {
   local path="$1"
   SELECTED_WEBP_QUALITY="$DEFAULT_WEBP_QUALITY"
   SELECTED_AVIF_QUALITY="$DEFAULT_AVIF_ENCODING_QUALITY"
   SELECTED_AVIF_ALPHA_QUALITY="$DEFAULT_AVIF_ALPHA_QUALITY"
+  LAST_MATCHED_PROFILE_PATTERN=""
 
   local idx
   for idx in "${!PROFILE_PATTERNS[@]}"; do
     if [[ "$path" =~ ${PROFILE_PATTERNS[$idx]} ]]; then
+      LAST_MATCHED_PROFILE_PATTERN="${PROFILE_DISPLAY_PATTERNS[$idx]}"
       local candidate
       candidate="${PROFILE_WEBP_QUALITIES[$idx]}"
       if [[ -n "$candidate" ]]; then
@@ -377,6 +392,9 @@ convert_file() {
   local webp_quality="$SELECTED_WEBP_QUALITY"
   local avif_quality="$SELECTED_AVIF_QUALITY"
   local avif_alpha_quality="$SELECTED_AVIF_ALPHA_QUALITY"
+  if [[ -n "$LAST_MATCHED_PROFILE_PATTERN" ]]; then
+    log "Matched profile regex '${LAST_MATCHED_PROFILE_PATTERN}' for $rel (webp=$webp_quality; avif=$avif_quality; avif-alpha=$avif_alpha_quality)"
+  fi
 
   if needs_rebuild "$src" "$webp"; then
     if [[ "$lower_ext" == "gif" && "$animated_gif" == true ]]; then
